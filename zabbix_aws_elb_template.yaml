@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2023-11-20T06:51:48Z'
+  date: '2023-11-20T07:40:41Z'
   groups:
     - uuid: c2c162144c2d4c5491c8801193af4945
       name: Templates/Cloud
@@ -17,7 +17,7 @@ zabbix_export:
         
         매크로 설명
         {$AWS.ACCESS.KEY.ID} : 억세스 키
-        {$AWS.AUTH_TYPE} : 역활 기반이면 role_base, 인증키 기반이면 access_key 입력
+        {$AWS.AUTH_TYPE} : 역활 기반이면 robe_base, 인증키 기반이면 access_key 입력
         {$AWS.ELB.INSTANCE.ID} : 로드발란서의 ARN값에서 app/my-alb/ed123456a12f01d0 부분에 해당하는 값
         {$AWS.REGION} : 로드발란서가 있는 AWS 지역 코드
         {$AWS.SECRET.ACCESS.KEY} : 시크릿 키
@@ -39,7 +39,7 @@ zabbix_export:
         }
         
         Created by 2023-11-20
-        Template by fallboyz@umount.net
+        Template by coulson.p@mibank.me
       groups:
         - name: Templates/Cloud
       items:
@@ -849,22 +849,6 @@ zabbix_export:
           type: SECRET_TEXT
           description: 'Secret access key.'
   graphs:
-    - uuid: 3012ea5b290b44f592176dd25d5817a4
-      name: 'AWS ELB: Active Connections'
-      graph_items:
-        - color: 0040FF
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.activeconnectioncount
-    - uuid: f9dfe3d25ddb4ee9b4f4b37e7d888c99
-      name: 'AWS ELB: Consumed LCUs'
-      graph_items:
-        - color: 4000FF
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.consumedlcus
     - uuid: 7a0f738483a847929a34b943a9b0cda7
       name: 'AWS ELB: HTTP 5XX Code'
       graph_items:
@@ -891,22 +875,6 @@ zabbix_export:
           item:
             host: 'AWS ELB by HTTP'
             key: aws.elb.httpcode_elb_504_count
-    - uuid: 445ec1be43354cfb93f0ebe141eeba85
-      name: 'AWS ELB: HTTP Fixed Response Count'
-      graph_items:
-        - color: FF0000
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.http_fixed_response_count
-    - uuid: 15418a189918466982ffa7ae23ce7f55
-      name: 'AWS ELB: HTTP Redirect Count'
-      graph_items:
-        - color: 1A7C11
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.http_redirect_count
     - uuid: b24726b653e94985b4b39a3032d6ce63
       name: 'AWS ELB: HTTP XXX Code'
       graph_items:
@@ -927,35 +895,3 @@ zabbix_export:
           item:
             host: 'AWS ELB by HTTP'
             key: aws.elb.httpcode_elb_5xx_count
-    - uuid: 6bd9dd64861d486793db0ec50d9cfa99
-      name: 'AWS ELB: New Connections'
-      graph_items:
-        - color: 1A7C11
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.newconnectioncount
-    - uuid: 697e9d83b2344983bd88da762263c87a
-      name: 'AWS ELB: Processed Bytes'
-      graph_items:
-        - color: 7E57C2
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.processedbytes
-    - uuid: 077484f3df204b58aea9a80598827f78
-      name: 'AWS ELB: Rejected Connections'
-      graph_items:
-        - color: FF0000
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.rejectedconnectioncount
-    - uuid: 0e99630c96fa419ca50181d3183ba758
-      name: 'AWS ELB: Rule Evaluations'
-      graph_items:
-        - color: 0040FF
-          calc_fnc: ALL
-          item:
-            host: 'AWS ELB by HTTP'
-            key: aws.elb.ruleevaluations
