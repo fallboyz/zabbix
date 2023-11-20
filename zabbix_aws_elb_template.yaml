@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2023-11-20T07:40:41Z'
+  date: '2023-11-20T08:16:01Z'
   groups:
     - uuid: c2c162144c2d4c5491c8801193af4945
       name: Templates/Cloud
@@ -506,7 +506,7 @@ zabbix_export:
               value: 'AWS ELB'
           triggers:
             - uuid: 039156465ea54b63abbf57c91b5f7d68
-              expression: 'sum(/AWS ELB by HTTP/aws.elb.httpcode_elb_4xx_count, 5m) > 50'
+              expression: 'avg(/AWS ELB by HTTP/aws.elb.httpcode_elb_4xx_count, 5m) > 50'
               name: 'High 4XX Error rate on {HOST.NAME}'
               priority: WARNING
         - uuid: ebcf0f48fe96472c9ecdca0ab5e87b76
@@ -530,7 +530,7 @@ zabbix_export:
               value: 'AWS ELB'
           triggers:
             - uuid: 4bba5544494f4b07a86fe5c293f89a0f
-              expression: 'sum(/AWS ELB by HTTP/aws.elb.httpcode_elb_5xx_count, 5m) > 50'
+              expression: 'avg(/AWS ELB by HTTP/aws.elb.httpcode_elb_5xx_count, 5m) > 50'
               name: 'High 5XX Error rate on {HOST.NAME}'
               priority: WARNING
         - uuid: ebcf0f48fe96472c9ecdca0ab5e87b77
@@ -848,7 +848,99 @@ zabbix_export:
         - macro: '{$AWS.SECRET.ACCESS.KEY}'
           type: SECRET_TEXT
           description: 'Secret access key.'
+      dashboards:
+        - uuid: be9f747a424e41149f11c3b044a7779e
+          name: 'AWS ELB: Default Dashboard'
+          display_period: '60'
+          auto_start: 'NO'
+          pages:
+            - name: 'AWS ELB: Global View'
+              widgets:
+                - type: GRAPH_CLASSIC
+                  width: '24'
+                  height: '6'
+                  fields:
+                    - type: GRAPH
+                      name: graphid
+                      value:
+                        host: 'AWS ELB by HTTP'
+                        name: 'AWS ELB: Connections'
+                - type: GRAPH_CLASSIC
+                  'y': '6'
+                  width: '12'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid
+                      value:
+                        host: 'AWS ELB by HTTP'
+                        name: 'AWS ELB: HTTP XXX Code'
+                - type: GRAPH_CLASSIC
+                  'y': '11'
+                  width: '24'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid
+                      value:
+                        host: 'AWS ELB by HTTP'
+                        name: 'AWS ELB: Processed Bytes'
+                - type: GRAPH_CLASSIC
+                  x: '12'
+                  'y': '6'
+                  width: '12'
+                  height: '5'
+                  fields:
+                    - type: GRAPH
+                      name: graphid
+                      value:
+                        host: 'AWS ELB by HTTP'
+                        name: 'AWS ELB: HTTP 5XX Code'
   graphs:
+    - uuid: 0d241f9fb8f145febd954b7472007104
+      name: 'AWS ELB: Connections'
+      graph_items:
+        - color: 1A7C11
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.activeconnectioncount
+        - sortorder: '1'
+          color: '274482'
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.newconnectioncount
+        - sortorder: '2'
+          color: F63100
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.rejectedconnectioncount
+        - sortorder: '3'
+          color: AC8C14
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.clienttlsnegotiationerrorcount
+        - sortorder: '4'
+          color: FC6EA3
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.http_redirect_count
+        - sortorder: '5'
+          color: 2774A4
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.requestcount
+        - sortorder: '6'
+          color: 6C59DC
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.grpcrequestcount
     - uuid: 7a0f738483a847929a34b943a9b0cda7
       name: 'AWS ELB: HTTP 5XX Code'
       graph_items:
@@ -895,3 +987,17 @@ zabbix_export:
           item:
             host: 'AWS ELB by HTTP'
             key: aws.elb.httpcode_elb_5xx_count
+    - uuid: c8487a2fde9f44008faee5f4c4b6b63c
+      name: 'AWS ELB: Processed Bytes'
+      graph_items:
+        - color: 1A7C11
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.processedbytes
+        - sortorder: '1'
+          color: 0040FF
+          calc_fnc: ALL
+          item:
+            host: 'AWS ELB by HTTP'
+            key: aws.elb.ipv6processedbytes
