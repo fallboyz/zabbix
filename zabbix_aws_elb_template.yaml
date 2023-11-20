@@ -39,7 +39,7 @@ zabbix_export:
         }
         
         Created by 2023-11-20
-        Template by coulson.p@mibank.me
+        Template by fallboyz@umount.net
       groups:
         - name: Templates/Cloud
       items:
@@ -427,7 +427,7 @@ zabbix_export:
             모니터링 데이터는 아래 페이지를 참고하였습니다.
             https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
             
-            Template by coulson.p@mibank.me
+            Template by fallboyz@umount.net
           preprocessing:
             - type: CHECK_NOT_SUPPORTED
               parameters:
