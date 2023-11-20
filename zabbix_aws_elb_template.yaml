@@ -17,7 +17,7 @@ zabbix_export:
         
         매크로 설명
         {$AWS.ACCESS.KEY.ID} : 억세스 키
-        {$AWS.AUTH_TYPE} : 역활 기반이면 robe_base, 인증키 기반이면 access_key 입력
+        {$AWS.AUTH_TYPE} : 역활 기반이면 role_base, 인증키 기반이면 access_key 입력
         {$AWS.ELB.INSTANCE.ID} : 로드발란서의 ARN값에서 app/my-alb/ed123456a12f01d0 부분에 해당하는 값
         {$AWS.REGION} : 로드발란서가 있는 AWS 지역 코드
         {$AWS.SECRET.ACCESS.KEY} : 시크릿 키
