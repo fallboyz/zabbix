@@ -1,0 +1,681 @@
+zabbix_export:
+  version: '6.0'
+  date: '2023-11-23T07:19:58Z'
+  groups:
+    - uuid: c2c162144c2d4c5491c8801193af4945
+      name: Templates/Cloud
+  templates:
+    - uuid: e53fff3431204932b1015ea36ec433cd
+      template: 'AWS NAT Gateway by HTTP'
+      name: 'AWS NAT Gateway by HTTP'
+      description: |
+        이 템플릿은 자빅스의 AWS 공식 템플릿을 참고하여 NAT-Gateway를 모니터링 하기 위하여 만들었습니다.
+        https://www.zabbix.com/integrations/aws
+        
+        모니터링 데이터는 아래 페이지를 참고하였습니다.
+        https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+        
+        매크로 설명
+        {$AWS.ACCESS.KEY.ID} : 억세스 키
+        {$AWS.AUTH_TYPE} : 역활 기반이면 role_base, 인증키 기반이면 access_key 입력
+        {$AWS.NAT.GATEWAY.ID} : NAT Gateway 아이디 (ex: nat-01234abcde567fg89)
+        {$AWS.REGION} : 로드발란서가 있는 AWS 지역 코드
+        {$AWS.SECRET.ACCESS.KEY} : 시크릿 키
+        
+        주의: 적절한 IAM 권한이 있어야 합니다. 아래는 최소 권한 정책이며, 바뀔 수 있습니다.
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "cloudwatch:GetMetricStatistics",
+                        "cloudwatch:ListMetrics",
+                        "cloudwatch:GetMetricData"
+                    ],
+                    "Resource": "*"
+                }
+            ]
+        }
+        
+        Created by 2023-11-23
+        Template by fallboyz@umount.net
+      groups:
+        - name: Templates/Cloud
+      items:
+        - uuid: ef8d118b88a845b1be5db8f120709801
+          name: 'AWS NATGateway: ActiveConnectionCount'
+          type: DEPENDENT
+          key: aws.natgateway.activeconnectioncount
+          delay: '0'
+          history: 7d
+          description: |
+            The total number of concurrent active TCP connections through the NAT gateway.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "ActiveConnectionCount")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709802
+          name: 'AWS NATGateway: BytesInFromDestination'
+          type: DEPENDENT
+          key: aws.natgateway.bytesinfromdestination
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: B
+          description: |
+            The number of bytes received by the NAT gateway from the destination.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "BytesInFromDestination")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709803
+          name: 'AWS NATGateway: BytesInFromSource'
+          type: DEPENDENT
+          key: aws.natgateway.bytesinfromsource
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: B
+          description: |
+            The number of bytes received by the NAT gateway from clients in your VPC.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "BytesInFromSource")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: eace497b8ec9449ca5625dcfc2b85779
+          name: 'AWS NATGateway: BytesOutToDestination'
+          type: DEPENDENT
+          key: aws.natgateway.bytesouttodestination
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: B
+          description: |
+            The number of bytes sent out through the NAT gateway to the destination.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+            
+            This metric tracks the amount of data going out to the internet through the NAT Gateway. The outbound traffic cost of the NAT Gateway is significantly influenced by this metric.
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "BytesOutToDestination")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709804
+          name: 'AWS NATGateway: BytesOutToSource'
+          type: DEPENDENT
+          key: aws.natgateway.bytesouttosource
+          delay: '0'
+          history: 7d
+          value_type: FLOAT
+          units: B
+          description: |
+            The number of bytes sent through the NAT gateway to the clients in your VPC.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "BytesOutToSource")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709805
+          name: 'AWS NATGateway: ConnectionAttemptCount'
+          type: DEPENDENT
+          key: aws.natgateway.connectionattemptcount
+          delay: '0'
+          history: 7d
+          description: |
+            The number of connection attempts made through the NAT gateway.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "ConnectionAttemptCount")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709806
+          name: 'AWS NATGateway: ConnectionEstablishedCount'
+          type: DEPENDENT
+          key: aws.natgateway.connectionestablishedcount
+          delay: '0'
+          history: 7d
+          description: |
+            The number of connections established through the NAT gateway.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "ConnectionEstablishedCount")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709807
+          name: 'AWS NATGateway: ErrorPortAllocation'
+          type: DEPENDENT
+          key: aws.natgateway.errorportallocation
+          delay: '0'
+          history: 7d
+          description: |
+            The number of times the NAT gateway could not allocate a source port.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "ErrorPortAllocation")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: f353564661da4690ac07f98fedeee174
+          name: 'AWS NATGateway: Get metrics data'
+          type: SCRIPT
+          key: aws.natgateway.get_metrics
+          delay: 60s
+          history: 30d
+          trends: '0'
+          value_type: TEXT
+          params: |
+            var AWS = {
+                params: {},
+                request_period: 60,
+            
+                getField: function (data, path) {
+                    var steps = path.split('.');
+                    for (var i = 0; i < steps.length; i++) {
+                        var step = steps[i];
+                        if (typeof data !== 'object' || typeof data[step] === 'undefined') {
+                            throw 'Required field was not found: ' + path;
+                        }
+            
+                        data = data[step];
+                    }
+            
+                    return data;
+                },
+            
+                setParams: function (params) {
+                    switch (AWS.getField(params, 'auth_type')) {
+                        case 'role_base':
+                            AWS.params['auth_type'] = 'role_base';
+                            var request = new HttpRequest(),
+                                IamRoleName = request.get('http://169.254.169.254/latest/meta-data/iam/security-credentials');
+            
+                            if (request.getStatus() !== 200 || IamRoleName === null || IamRoleName === '') {
+                                throw 'Error getting security credentials from instance metadata. Role not found.';
+                            }
+            
+                            credentials = request.get('http://169.254.169.254/latest/meta-data/iam/security-credentials/' + encodeURI(IamRoleName));
+            
+                            if (request.getStatus() !== 200 || credentials === null || credentials === '') {
+                                throw 'Error getting security credentials from instance metadata.';
+                            }
+            
+                            try {
+                                credentials = JSON.parse(credentials);
+                            }
+                            catch (error) {
+                                throw 'Failed to parse response received from instance metadata. Check debug log for more information.';
+                            }
+            
+                            ['AccessKeyId', 'SecretAccessKey', 'Token'].forEach(function (field) {
+                                if (typeof credentials !== 'object' || typeof credentials[field] === 'undefined' || credentials[field] === '') {
+                                    throw 'Required credentials is not set: "' + field + '".';
+                                };
+                                AWS.params[field] = credentials[field];
+                            });
+                            break;
+                        case 'access_key':
+                        default:
+                            AWS.params['auth_type'] = 'access_key';
+                            ['AccessKeyId', 'SecretAccessKey'].forEach(function (field) {
+                                if (typeof params !== 'object' || typeof params[field] === 'undefined' || params[field] === '') {
+                                    throw 'Required param is not set: "' + field + '".';
+                                }
+                                AWS.params[field] = params[field];
+                            });
+                    }
+                    ['region', 'nat_gateway_id'].forEach(function (field) {
+                        if (typeof params !== 'object' || typeof params[field] === 'undefined' || params[field] === '') {
+                            throw 'Required param is not set: "' + field + '".';
+                        }
+                        AWS.params[field] = params[field];
+                    });
+                },
+            
+                sign: function (key, message) {
+                    var hex = hmac('sha256', key, message);
+            
+                    if ((hex.length % 2) === 1) {
+                        throw 'Invalid length of a hex string!';
+                    }
+            
+                    var result = new Int8Array(hex.length / 2);
+                    for (var i = 0, b = 0; i < hex.length; i += 2, b++) {
+                        result[b] = parseInt(hex.substring(i, i + 2), 16);
+                    }
+            
+                    return result;
+                },
+            
+                renderMetricQuery: function (period, nat_gateway_id) {
+                    var metrics_list = [
+                        'ActiveConnectionCount:Count:Maximum',
+                        'BytesInFromDestination:Bytes:Sum',
+                        'BytesInFromSource:Bytes:Sum',
+                        'BytesOutToDestination:Bytes:Sum',
+                        'BytesOutToSource:Bytes:Sum',
+                        'ConnectionAttemptCount:Count:Sum',
+                        'ConnectionEstablishedCount:Count:Sum',
+                        'ErrorPortAllocation:Count:Sum',
+                        'IdleTimeoutCount:Count:Sum',
+                        'PacketsDropCount:Count:Sum',
+                        'PacketsInFromDestination:Count:Sum',
+                        'PacketsInFromSource:Count:Sum',
+                        'PacketsOutToDestination:Count:Sum',
+                        'PacketsOutToSource:Count:Sum',
+                        'PeakBytesPerSecond:Count:Maximum',
+                        'PeakPacketsPerSecond:Count:Maximum'
+                    ];
+            
+                    var metric_payload = [];
+                    metrics_list.forEach(function (metric) {
+                        var parts = metric.split(':', 3);
+                        var name = parts[0].replace(/[^a-zA-Z0-9_]/g, '');
+                        metric_payload.push({
+                            'Id': name.charAt(0).toLowerCase() + name.slice(1),
+                            'MetricStat': {
+                                'Metric': {
+                                    'MetricName': parts[0],
+                                    'Namespace': 'AWS/NATGateway',
+                                    'Dimensions': [
+                                        {
+                                            'Name': 'NatGatewayId',
+                                            'Value': nat_gateway_id
+                                        }
+                                    ]
+                                },
+                                'Period': period,
+                                'Stat': parts[2],
+                                'Unit': parts[1]
+                            }
+                        });
+                    });
+            
+                    return metric_payload;
+            
+                },
+                prepareParams: function (params) {
+                    var result = [];
+            
+                    Object.keys(params).sort().forEach(function (key) {
+                        if (typeof params[key] !== 'object') {
+                            result.push(key + '=' + encodeURIComponent(params[key]));
+                        }
+                        else {
+                            result.push(prepareObject(key, params[key]));
+                        }
+                    });
+            
+                    return result.join('&');
+                },
+            
+                request: function (method, region, service, request_data) {
+                    if (typeof request_data === 'undefined' || request_data === null) {
+                        request_data = '';
+                    }
+                    else {
+                        request_data = JSON.stringify(request_data)
+                    }
+            
+                    var amzdate = (new Date()).toISOString().replace(/\.\d+Z/, 'Z').replace(/[-:]/g, ''),
+                        date = amzdate.replace(/T\d+Z/, ''),
+                        host = service + '.' + region + '.amazonaws.com',
+                        canonical_uri = '/';
+            
+                        if (AWS.params.auth_type === 'role_base'){
+                            var canonical_headers = 'content-encoding:amz-1.0\n' + 'host:' + host + '\n' + 'x-amz-date:' + amzdate + '\n' + 'x-amz-security-token:' + AWS.params.Token + '\n',
+                                signed_headers = 'content-encoding;host;x-amz-date;x-amz-security-token';
+                        } else {
+                            var canonical_headers = 'content-encoding:amz-1.0\n' + 'host:' + host + '\n' + 'x-amz-date:' + amzdate + '\n',
+                                signed_headers = 'content-encoding;host;x-amz-date';
+                        }
+                
+                        var canonical_request = method + '\n' + canonical_uri + '\n' + '\n' + canonical_headers + '\n' + signed_headers + '\n' + sha256(request_data),
+                            credential_scope = date + '/' + region + '/' + service + '/' + 'aws4_request',
+                        request_string = 'AWS4-HMAC-SHA256' + '\n' + amzdate + '\n' + credential_scope + '\n' + sha256(canonical_request),
+                        key = AWS.sign('AWS4' + AWS.params.SecretAccessKey, date);
+            
+                    key = AWS.sign(key, region);
+                    key = AWS.sign(key, service);
+                    key = AWS.sign(key, 'aws4_request');
+            
+                    var request = new HttpRequest(),
+                        url = 'https://' + host + canonical_uri;
+            
+                    if (typeof AWS.params.proxy !== 'undefined' && AWS.params.proxy !== '') {
+                        request.setProxy(AWS.params.proxy);
+                    }
+                    request.addHeader('x-amz-date: ' + amzdate);
+                    request.addHeader('X-Amz-Target: GraniteServiceVersion20100801.GetMetricData')
+                    request.addHeader('Accept: application/json');
+                    request.addHeader('Content-Type: application/json');
+                    request.addHeader('Content-Encoding: amz-1.0');
+                    request.addHeader('Authorization: ' + 'AWS4-HMAC-SHA256 Credential=' + AWS.params.AccessKeyId + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + hmac('sha256', key, request_string));
+                    if (AWS.params.auth_type === 'role_base')
+                        request.addHeader('X-Amz-Security-Token: ' + AWS.params.Token);
+                    
+                    Zabbix.log(4, '[ AWS NATGatway ] Sending request: ' + url);
+            
+                    response = request.post(url, request_data);
+                    Zabbix.log(4, '[ AWS NATGatway ] Received response with status code ' + request.getStatus() + ': ' + response);
+            
+                    if (request.getStatus() !== 200) {
+                        throw 'Request failed with status code ' + request.getStatus() + ': ' + response;
+                    }
+            
+                    if (response !== null) {
+                        try {
+                            response = JSON.parse(response);
+                        }
+                        catch (error) {
+                            throw 'Failed to parse response received from AWS CloudWatch API. Check debug log for more information.';
+                        }
+                    }
+            
+                    return response;
+                },
+            
+                getMetricsData: function () {
+                    var payload={},
+                        end_time = Math.floor((new Date().getTime())/1000),
+                        start_time = end_time - AWS.request_period;
+            
+                    payload['StartTime'] = start_time;
+                    payload['EndTime'] = end_time;
+                    payload['ScanBy'] = 'TimestampDescending';
+                    payload['MetricDataQueries'] = AWS.renderMetricQuery(AWS.request_period, AWS.params.nat_gateway_id);
+                    result = AWS.request('POST', AWS.params.region, 'monitoring', payload);
+                    if (typeof result !== 'object' || typeof result.MetricDataResults !== 'object') {
+                        throw 'Cannot get metrics data from AWS CloudWatch API. Check debug log for more information.';
+                    }
+            
+                    return result.MetricDataResults;
+                }
+            };
+            
+            try {
+                AWS.setParams(JSON.parse(value));
+            
+                return JSON.stringify(AWS.getMetricsData());
+            }
+            catch (error) {
+                error += (String(error).endsWith('.')) ? '' : '.';
+                Zabbix.log(3, '[ AWS NATGatway ] ERROR: ' + error);
+                
+                return JSON.stringify({'error': error});
+            }
+          description: |
+            이 아이템은 자빅스의 AWS 공식 템플릿을 참고하여 NAT-Gateway를 모니터링 하기 위하여 만들었습니다.
+            https://www.zabbix.com/integrations/aws
+            
+            모니터링 데이터는 아래 페이지를 참고하였습니다.
+            https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+            
+            Template by fallboyz@umount.net
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - ''
+          timeout: 15s
+          parameters:
+            - name: AccessKeyId
+              value: '{$AWS.ACCESS.KEY.ID}'
+            - name: auth_type
+              value: '{$AWS.AUTH_TYPE}'
+            - name: nat_gateway_id
+              value: '{$AWS.NAT.GATEWAY.ID}'
+            - name: region
+              value: '{$AWS.REGION}'
+            - name: SecretAccessKey
+              value: '{$AWS.SECRET.ACCESS.KEY}'
+          tags:
+            - tag: component
+              value: raw
+        - uuid: ef8d118b88a845b1be5db8f120709808
+          name: 'AWS NATGateway: IdleTimeoutCount'
+          type: DEPENDENT
+          key: aws.natgateway.idletimeoutcount
+          delay: '0'
+          history: 7d
+          description: |
+            The number of connections that transitioned from the active state to the idle state. An active connection transitions to idle if it was not closed gracefully and there was no activity for the last 350 seconds.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "IdleTimeoutCount")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709809
+          name: 'AWS NATGateway: PacketsDropCount'
+          type: DEPENDENT
+          key: aws.natgateway.packetsdropcount
+          delay: '0'
+          history: 7d
+          description: |
+            The number of packets dropped by the NAT gateway.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "PacketsDropCount")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709810
+          name: 'AWS NATGateway: PacketsInFromDestination'
+          type: DEPENDENT
+          key: aws.natgateway.packetsinfromdestination
+          delay: '0'
+          history: 7d
+          description: |
+            The number of packets received by the NAT gateway from the destination.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "PacketsInFromDestination")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709811
+          name: 'AWS NATGateway: PacketsInFromSource'
+          type: DEPENDENT
+          key: aws.natgateway.packetsinfromsource
+          delay: '0'
+          history: 7d
+          description: |
+            The number of packets received by the NAT gateway from clients in your VPC.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "PacketsInFromSource")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709812
+          name: 'AWS NATGateway: PacketsOutToDestination'
+          type: DEPENDENT
+          key: aws.natgateway.packetsouttodestination
+          delay: '0'
+          history: 7d
+          description: |
+            The number of packets sent out through the NAT gateway to the destination.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "PacketsOutToDestination")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709813
+          name: 'AWS NATGateway: PacketsOutToSource'
+          type: DEPENDENT
+          key: aws.natgateway.packetsouttosource
+          delay: '0'
+          history: 7d
+          description: |
+            The number of packets sent through the NAT gateway to the clients in your VPC.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "PacketsOutToSource")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709814
+          name: 'AWS NATGateway: PeakBytesPerSecond'
+          type: DEPENDENT
+          key: aws.natgateway.peakbytespersecond
+          delay: '0'
+          history: 7d
+          description: |
+            This metric reports the highest 10-second bytes per second average in a given minute.
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "PeakBytesPerSecond")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+        - uuid: ef8d118b88a845b1be5db8f120709815
+          name: 'AWS NATGateway: PeakPacketsPerSecond'
+          type: DEPENDENT
+          key: aws.natgateway.peakpacketspersecond
+          delay: '0'
+          history: 7d
+          description: |
+            This metric calculates the average packet rate (packets processed per second) every 10 seconds for 60 seconds and then reports the maximum of the six rates (the highest average packet rate).
+            
+            https://docs.aws.amazon.com/ko_kr/vpc/latest/userguide/vpc-nat-gateway-cloudwatch.html
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.[?(@.Label == "PeakPacketsPerSecond")].Values.first().first()'
+          master_item:
+            key: aws.natgateway.get_metrics
+          tags:
+            - tag: Application
+              value: 'AWS NATGateway'
+      tags:
+        - tag: class
+          value: software
+        - tag: target
+          value: aws
+        - tag: target
+          value: natgateway
+      macros:
+        - macro: '{$AWS.ACCESS.KEY.ID}'
+          description: 'Access key ID.'
+        - macro: '{$AWS.AUTH_TYPE}'
+          value: role_base
+          description: 'Authorization method. Possible values: role_base, access_key.'
+        - macro: '{$AWS.NAT.GATEWAY.ID}'
+          description: 'Nat Gateway ID.'
+        - macro: '{$AWS.REGION}'
+          description: 'Amazon ELB Region code.'
+        - macro: '{$AWS.SECRET.ACCESS.KEY}'
+          type: SECRET_TEXT
+          description: 'Secret access key.'
+  graphs:
+    - uuid: 4b682518301e4b5c861718ab4e1ce035
+      name: 'AWS NATGateway: Data Transfer Bytes'
+      graph_items:
+        - color: 1A7C11
+          calc_fnc: ALL
+          item:
+            host: 'AWS NAT Gateway by HTTP'
+            key: aws.natgateway.bytesinfromdestination
+        - sortorder: '1'
+          color: 673AB7
+          calc_fnc: ALL
+          item:
+            host: 'AWS NAT Gateway by HTTP'
+            key: aws.natgateway.bytesinfromsource
+        - sortorder: '2'
+          color: FF0000
+          calc_fnc: ALL
+          item:
+            host: 'AWS NAT Gateway by HTTP'
+            key: aws.natgateway.bytesouttodestination
+        - sortorder: '3'
+          color: 2774A4
+          calc_fnc: ALL
+          item:
+            host: 'AWS NAT Gateway by HTTP'
+            key: aws.natgateway.bytesouttosource
