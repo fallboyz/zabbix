@@ -16,7 +16,7 @@ zabbix_export:
         https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
         
         매크로 설명
-        {$AWS.ACCESS.KEY.ID}: AWS 액세스 키입니다.
+        {$AWS.ACCESS.KEY.ID}: AWS 액세스 키 입니다.
         {$AWS.AUTH_TYPE}: 역할 기반(role_base) 인증 또는 액세스키 기반(access_key) 인증을 위해 입력합니다.
         {$AWS.ELB.INSTANCE.ARN}: 로드 밸런서의 ARN입니다.
         {$AWS.REGION}: AWS 리전입니다.
@@ -24,6 +24,7 @@ zabbix_export:
         {$AWS.ELB.4XX.WARN}: HTTP 5XX 오류 코드에 대한 트리거에 경고로 사용할 값을 입력합니다.
         {$AWS.ELB.REJECTED.WARN}: 거부된 연결이 너무 많을 때 트리거에서 경고로 사용할 값을 입력합니다.
         {$AWS.ELB.ACTIVECONNECTION.WARN}: 너무 많은 활성 연결에 대한 트리거에서 경고로 사용할 값을 입력합니다.
+        {$AWS.SECRET.ACCESS.KEY}: AWS 시크릿 억세스 키 입니다.
         
         주의: 적절한 IAM 권한이 있어야 합니다. 아래는 최소 권한 정책이며, 바뀔 수 있습니다.
         {
