@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2023-11-20T08:16:01Z'
+  date: '2023-11-29T02:35:18Z'
   groups:
     - uuid: c2c162144c2d4c5491c8801193af4945
       name: Templates/Cloud
@@ -31,7 +31,10 @@ zabbix_export:
                     "Action": [
                         "cloudwatch:GetMetricStatistics",
                         "cloudwatch:ListMetrics",
-                        "cloudwatch:GetMetricData"
+                        "cloudwatch:GetMetricData",
+                        "elasticloadbalancing:DescribeTargetGroups",
+                        "elasticloadbalancing:DescribeLoadBalancers",
+                        "elasticloadbalancing:DescribeTargetHealth"
                     ],
                     "Resource": "*"
                 }
@@ -57,6 +60,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ActiveConnectionCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -64,9 +68,9 @@ zabbix_export:
               value: 'AWS ELB'
           triggers:
             - uuid: 710c069d83e142b19039db73e2737979
-              expression: 'avg(/AWS ELB by HTTP/aws.elb.activeconnectioncount, 5m) > 1000'
-              name: 'Too many Active Connections on  {HOST.NAME}'
-              priority: INFO
+              expression: 'sum(/AWS ELB by HTTP/aws.elb.activeconnectioncount, 5m) > {$AWS.ELB.ACTIVECONNECTION.WARN}'
+              name: 'AWS ELB: Too many Active Connections on  {HOST.NAME}'
+              priority: WARNING
         - uuid: ebcf0f48fe96472c9ecdca0ab5e87b65
           name: 'AWS ELB: ClientTLSNegotiationErrorCount'
           type: DEPENDENT
@@ -81,6 +85,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ClientTLSNegotiationErrorCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -101,6 +106,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ConsumedLCUs")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -120,6 +126,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "DesyncMitigationMode_NonCompliant_Request_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -139,6 +146,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "DroppedInvalidHeaderRequestCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -158,6 +166,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ForwardedInvalidHeaderRequestCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -189,7 +198,6 @@ zabbix_export:
             
                     return data;
                 },
-            
                 setParams: function (params) {
                     switch (AWS.getField(params, 'auth_type')) {
                         case 'role_base':
@@ -231,14 +239,16 @@ zabbix_export:
                                 AWS.params[field] = params[field];
                             });
                     }
-                    ['region', 'elb_instance_id'].forEach(function (field) {
+                    ['region', 'elb_instance_arn'].forEach(function (field) {
                         if (typeof params !== 'object' || typeof params[field] === 'undefined' || params[field] === '') {
                             throw 'Required param is not set: "' + field + '".';
                         }
                         AWS.params[field] = params[field];
                     });
-                },
             
+                    var elbAppParts = AWS.params.elb_instance_arn.split('/');
+                    AWS.params.elb_app_id = elbAppParts[1] + '/' + elbAppParts[2] + '/' + elbAppParts[3];
+                },
                 sign: function (key, message) {
                     var hex = hmac('sha256', key, message);
             
@@ -253,8 +263,7 @@ zabbix_export:
             
                     return result;
                 },
-            
-                renderMetricQuery: function (period, elb_instance_id) {
+                renderMetricQuery: function (period, elb_app_id) {
                     var metrics_list = [
                       'ActiveConnectionCount:Count',
                       'ClientTLSNegotiationErrorCount:Count',
@@ -274,7 +283,7 @@ zabbix_export:
                       'HTTPCode_ELB_503_Count:Count',
                       'HTTPCode_ELB_504_Count:Count',
                       'IPv6ProcessedBytes:Bytes',
-                      'IPv6RequestCount:Count',          
+                      'IPv6RequestCount:Count',
                       'NewConnectionCount:Count',
                       'NonStickyRequestCount:Count',
                       'ProcessedBytes:Bytes',
@@ -296,7 +305,7 @@ zabbix_export:
                                     'Dimensions': [
                                         {
                                             'Name': 'LoadBalancer',
-                                            'Value': elb_instance_id
+                                            'Value': elb_app_id
                                         }
                                     ]
                                 },
@@ -324,7 +333,6 @@ zabbix_export:
             
                     return result.join('&');
                 },
-            
                 request: function (method, region, service, request_data) {
                     if (typeof request_data === 'undefined' || request_data === null) {
                         request_data = '';
@@ -390,7 +398,6 @@ zabbix_export:
             
                     return response;
                 },
-            
                 getMetricsData: function () {
                     var payload={},
                         end_time = Math.floor((new Date().getTime())/1000),
@@ -399,7 +406,7 @@ zabbix_export:
                     payload['StartTime'] = start_time;
                     payload['EndTime'] = end_time;
                     payload['ScanBy'] = 'TimestampDescending';
-                    payload['MetricDataQueries'] = AWS.renderMetricQuery(AWS.request_period, AWS.params.elb_instance_id);
+                    payload['MetricDataQueries'] = AWS.renderMetricQuery(AWS.request_period, AWS.params.elb_app_id);
                     result = AWS.request('POST', AWS.params.region, 'monitoring', payload);
                     if (typeof result !== 'object' || typeof result.MetricDataResults !== 'object') {
                         throw 'Cannot get metrics data from AWS CloudWatch API. Check debug log for more information.';
@@ -438,8 +445,8 @@ zabbix_export:
               value: '{$AWS.ACCESS.KEY.ID}'
             - name: auth_type
               value: '{$AWS.AUTH_TYPE}'
-            - name: elb_instance_id
-              value: '{$AWS.ELB.INSTANCE.ID}'
+            - name: elb_instance_arn
+              value: '{$AWS.ELB.INSTANCE.ARN}'
             - name: region
               value: '{$AWS.REGION}'
             - name: SecretAccessKey
@@ -461,6 +468,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "GrpcRequestCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -480,6 +488,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTPCode_ELB_3XX_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -499,6 +508,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTPCode_ELB_4XX_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -506,8 +516,8 @@ zabbix_export:
               value: 'AWS ELB'
           triggers:
             - uuid: 039156465ea54b63abbf57c91b5f7d68
-              expression: 'avg(/AWS ELB by HTTP/aws.elb.httpcode_elb_4xx_count, 5m) > 50'
-              name: 'High 4XX Error rate on {HOST.NAME}'
+              expression: 'avg(/AWS ELB by HTTP/aws.elb.httpcode_elb_4xx_count, 1m) > {$AWS.ELB.4XX.WARN}'
+              name: 'AWS ELB: High 4XX Error rate on {HOST.NAME}'
               priority: WARNING
         - uuid: ebcf0f48fe96472c9ecdca0ab5e87b76
           name: 'AWS ELB: HTTPCode_ELB_5XX_Count'
@@ -523,6 +533,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTPCode_ELB_5XX_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -530,8 +541,8 @@ zabbix_export:
               value: 'AWS ELB'
           triggers:
             - uuid: 4bba5544494f4b07a86fe5c293f89a0f
-              expression: 'avg(/AWS ELB by HTTP/aws.elb.httpcode_elb_5xx_count, 5m) > 50'
-              name: 'High 5XX Error rate on {HOST.NAME}'
+              expression: 'avg(/AWS ELB by HTTP/aws.elb.httpcode_elb_5xx_count, 1m) > {$AWS.ELB.5XX.WARN}'
+              name: 'AWS ELB: High 5XX Error rate on {HOST.NAME}'
               priority: WARNING
         - uuid: ebcf0f48fe96472c9ecdca0ab5e87b77
           name: 'AWS ELB: HTTPCode_ELB_500_Count'
@@ -547,6 +558,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTPCode_ELB_500_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -566,6 +578,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTPCode_ELB_502_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -585,6 +598,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTPCode_ELB_503_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -604,6 +618,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTPCode_ELB_504_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -623,6 +638,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTP_Fixed_Response_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -642,6 +658,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTP_Redirect_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -661,6 +678,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "HTTP_Redirect_Url_Limit_Exceeded_Count")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -682,6 +700,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "IPv6ProcessedBytes")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -701,6 +720,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "IPv6RequestCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -720,6 +740,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "NewConnectionCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -739,6 +760,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "NonStickyRequestCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -760,6 +782,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ProcessedBytes")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -779,6 +802,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "RejectedConnectionCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -786,8 +810,8 @@ zabbix_export:
               value: 'AWS ELB'
           triggers:
             - uuid: aca10ca5489a4c8892e98726bdb5591f
-              expression: 'sum(/AWS ELB by HTTP/aws.elb.rejectedconnectioncount, 5m) > 50'
-              name: 'Too many Rejected Connections on {HOST.NAME}'
+              expression: 'sum(/AWS ELB by HTTP/aws.elb.rejectedconnectioncount, 5m) > {$AWS.ELB.REJECTED.WARN}'
+              name: 'AWS ELB: Too many Rejected Connections on {HOST.NAME}'
               priority: WARNING
         - uuid: ebcf0f48fe96472c9ecdca0ab5e87b87
           name: 'AWS ELB: RequestCount'
@@ -803,6 +827,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "RequestCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
@@ -822,11 +847,909 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "RuleEvaluations")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.elb.get_metrics
           tags:
             - tag: Application
               value: 'AWS ELB'
+      discovery_rules:
+        - uuid: 81508efe544f4e66a294ef5bbce1d100
+          name: 'AWS TargetGroups discovery'
+          type: SCRIPT
+          key: aws.targetgroups.discovery
+          delay: 1h
+          params: |
+            var AWS = {
+                params: {},
+                request_period: 3600,
+            
+                getField: function (data, path) {
+                    var steps = path.split('.');
+                    for (var i = 0; i < steps.length; i++) {
+                        var step = steps[i];
+                        if (typeof data !== 'object' || typeof data[step] === 'undefined') {
+                            throw 'Required field was not found: ' + path;
+                        }
+            
+                        data = data[step];
+                    }
+            
+                    return data;
+                },
+                setParams: function (params) {
+                    switch (AWS.getField(params, 'auth_type')) {
+                        case 'role_base':
+                            AWS.params['auth_type'] = 'role_base';
+                            var request = new HttpRequest(),
+                                IamRoleName = request.get('http://169.254.169.254/latest/meta-data/iam/security-credentials');
+            
+                            if (request.getStatus() !== 200 || IamRoleName === null || IamRoleName === '') {
+                                throw 'Error getting security credentials from instance metadata. Role not found.';
+                            }
+            
+                            credentials = request.get('http://169.254.169.254/latest/meta-data/iam/security-credentials/' + encodeURI(IamRoleName));
+            
+                            if (request.getStatus() !== 200 || credentials === null || credentials === '') {
+                                throw 'Error getting security credentials from instance metadata.';
+                            }
+            
+                            try {
+                                credentials = JSON.parse(credentials);
+                            }
+                            catch (error) {
+                                throw 'Failed to parse response received from instance metadata. Check debug log for more information.';
+                            }
+            
+                            ['AccessKeyId', 'SecretAccessKey', 'Token'].forEach(function (field) {
+                                if (typeof credentials !== 'object' || typeof credentials[field] === 'undefined' || credentials[field] === '') {
+                                    throw 'Required credentials is not set: "' + field + '".';
+                                };
+                                AWS.params[field] = credentials[field];
+                            });
+                            break;
+                        case 'access_key':
+                        default:
+                            AWS.params['auth_type'] = 'access_key';
+                            ['AccessKeyId', 'SecretAccessKey'].forEach(function (field) {
+                                if (typeof params !== 'object' || typeof params[field] === 'undefined' || params[field] === '') {
+                                    throw 'Required param is not set: "' + field + '".';
+                                }
+                                AWS.params[field] = params[field];
+                            });
+                    }
+                    ['region', 'elb_instance_arn'].forEach(function (field) {
+                        if (typeof params !== 'object' || typeof params[field] === 'undefined' || params[field] === '') {
+                            throw 'Required param is not set: "' + field + '".';
+                        }
+                        AWS.params[field] = params[field];
+                    });
+                },
+                sign: function (key, message) {
+                    var hex = hmac('sha256', key, message);
+            
+                    if ((hex.length % 2) === 1) {
+                        throw 'Invalid length of a hex string!';
+                    }
+            
+                    var result = new Int8Array(hex.length / 2);
+                    for (var i = 0, b = 0; i < hex.length; i += 2, b++) {
+                        result[b] = parseInt(hex.substring(i, i + 2), 16);
+                    }
+            
+                    return result;
+                },
+                prepareParams: function (params) {
+                    var result = [];
+            
+                    Object.keys(params).sort().forEach(function (key) {
+                        if (typeof params[key] !== 'object') {
+                            result.push(key + '=' + encodeURIComponent(params[key]));
+                        }
+                        else {
+                            result.push(prepareObject(key, params[key]));
+                        }
+                    });
+            
+                    return result.join('&');
+                },
+                request: function (method, region, service, params, data) {
+                    if (typeof data === 'undefined' || data === null) {
+                        data = '';
+                    }
+            
+                    var amzdate = (new Date()).toISOString().replace(/\.\d+Z/, 'Z').replace(/[-:]/g, ''),
+                        date = amzdate.replace(/T\d+Z/, ''),
+                        host = service + '.' + region + '.amazonaws.com',
+                        canonical_uri = '/',
+                        canonical_headers = 'content-encoding:amz-1.0\n' + 'host:' + host + '\n' + 'x-amz-date:' + amzdate + '\n',
+                        signed_headers = 'content-encoding;host;x-amz-date',
+                        canonical_request = method + '\n' + canonical_uri + '\n' + params + '\n' + canonical_headers + '\n' + signed_headers + '\n' + sha256(data),
+                        credential_scope = date + '/' + region + '/' + service + '/' + 'aws4_request',
+                        request_string = 'AWS4-HMAC-SHA256' + '\n' + amzdate + '\n' + credential_scope + '\n' + sha256(canonical_request),
+                        key = AWS.sign('AWS4' + AWS.params.SecretAccessKey, date);
+            
+                    key = AWS.sign(key, region);
+                    key = AWS.sign(key, service);
+                    key = AWS.sign(key, 'aws4_request');
+            
+                    var request = new HttpRequest(),
+                        url = 'https://' + host + canonical_uri + '?' + params;
+            
+                    request.addHeader('x-amz-date: ' + amzdate);
+                    request.addHeader('Accept: application/json');
+                    request.addHeader('Content-Type: application/json');
+                    request.addHeader('Content-Encoding: amz-1.0');
+                    request.addHeader('Authorization: ' + 'AWS4-HMAC-SHA256 Credential=' + AWS.params.AccessKeyId + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + hmac('sha256', key, request_string));
+                    if (AWS.params.auth_type === 'role_base')
+                        request.addHeader('X-Amz-Security-Token: ' + AWS.params.Token);
+                    
+                    Zabbix.log(4, '[ AWS TargetGroup ] Sending request: ' + url);
+            
+                    response = request.get(url);
+            
+                    Zabbix.log(4, '[ AWS TargetGroup ] Received response with status code ' + request.getStatus() + ': ' + response);
+            
+                    if (request.getStatus() !== 200) {
+                        throw 'Request failed with status code ' + request.getStatus() + ': ' + response;
+                    }
+            
+                    if (response !== null) {
+                        try {
+                            response = JSON.parse(response);
+                        }
+                        catch (error) {
+                            throw 'Failed to parse response received from AWS API. Check debug log for more information.';
+                        }
+                    }
+            
+                    return response;
+                },
+                getInstanceData: function () {
+                    var payload = {};
+            
+                    payload['Action'] = 'DescribeTargetGroups',
+                        payload['Version'] = '2015-12-01',
+                        payload['LoadBalancerArn'] = AWS.params.elb_instance_arn;
+            
+                    result = AWS.request('GET', AWS.params.region, 'elasticloadbalancing', AWS.prepareParams(payload));
+                    if (typeof result !== 'object'
+                        || typeof result.DescribeTargetGroupsResponse !== 'object'
+                        || typeof result.DescribeTargetGroupsResponse.DescribeTargetGroupsResult !== 'object'
+                        || typeof result.DescribeTargetGroupsResponse.DescribeTargetGroupsResult.TargetGroups !== 'object') {
+                        throw 'Cannot get metrics data from AWS API. Check debug log for more information.';
+                    }
+            
+                    var targetGroups = result.DescribeTargetGroupsResponse.DescribeTargetGroupsResult.TargetGroups;
+                    var lldData = targetGroups.map(function(group) {
+                        return {
+                            "{#TARGETGROUPARN}": group.TargetGroupArn,
+                            "{#TARGETGROUPNAME}": group.TargetGroupName
+                        };
+                    });
+            
+                    return { "data": lldData };
+                }
+            };
+            
+            try {
+                AWS.setParams(JSON.parse(value));
+            
+                return JSON.stringify(AWS.getInstanceData());
+            }
+            catch (error) {
+                error += (String(error).endsWith('.')) ? '' : '.';
+                Zabbix.log(3, '[ AWS TargetGroup ] ERROR: ' + error);
+            
+                return JSON.stringify({ 'error': error });
+            }
+          lifetime: 7d
+          description: |
+            이 디스커버리 규칙은 자빅스의 AWS 공식 템플릿을 참고하여 Target Group을 모니터링 하기 위하여 만들었습니다.
+            https://www.zabbix.com/integrations/aws
+            
+            이 디스커버리 규칙의 목적은 특정 로드발란서에 해당하는 타겟 그룹들의 이름과 ARN을 가져옵니다.
+            
+            Template by fallboyz@umount.net
+          item_prototypes:
+            - uuid: e5a6817ae5184a07b7518de24f4fc65e
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME} Get metrics data'
+              type: SCRIPT
+              key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              history: 7d
+              trends: '0'
+              value_type: TEXT
+              params: |
+                var AWS = {
+                    params: {},
+                    request_period: 300,
+                
+                    getField: function (data, path) {
+                        var steps = path.split('.');
+                        for (var i = 0; i < steps.length; i++) {
+                            var step = steps[i];
+                            if (typeof data !== 'object' || typeof data[step] === 'undefined') {
+                                throw 'Required field was not found: ' + path;
+                            }
+                
+                            data = data[step];
+                        }
+                
+                        return data;
+                    },
+                    setParams: function (params) {
+                        switch (AWS.getField(params, 'auth_type')) {
+                            case 'role_base':
+                                AWS.params['auth_type'] = 'role_base';
+                                var request = new HttpRequest(),
+                                    IamRoleName = request.get('http://169.254.169.254/latest/meta-data/iam/security-credentials');
+                
+                                if (request.getStatus() !== 200 || IamRoleName === null || IamRoleName === '') {
+                                    throw 'Error getting security credentials from instance metadata. Role not found.';
+                                }
+                
+                                credentials = request.get('http://169.254.169.254/latest/meta-data/iam/security-credentials/' + encodeURI(IamRoleName));
+                
+                                if (request.getStatus() !== 200 || credentials === null || credentials === '') {
+                                    throw 'Error getting security credentials from instance metadata.';
+                                }
+                
+                                try {
+                                    credentials = JSON.parse(credentials);
+                                }
+                                catch (error) {
+                                    throw 'Failed to parse response received from instance metadata. Check debug log for more information.';
+                                }
+                
+                                ['AccessKeyId', 'SecretAccessKey', 'Token'].forEach(function (field) {
+                                    if (typeof credentials !== 'object' || typeof credentials[field] === 'undefined' || credentials[field] === '') {
+                                        throw 'Required credentials is not set: "' + field + '".';
+                                    };
+                                    AWS.params[field] = credentials[field];
+                                });
+                                break;
+                            case 'access_key':
+                            default:
+                                AWS.params['auth_type'] = 'access_key';
+                                ['AccessKeyId', 'SecretAccessKey'].forEach(function (field) {
+                                    if (typeof params !== 'object' || typeof params[field] === 'undefined' || params[field] === '') {
+                                        throw 'Required param is not set: "' + field + '".';
+                                    }
+                                    AWS.params[field] = params[field];
+                                });
+                        }
+                        ['region', 'elb_instance_arn', 'target_group_arn'].forEach(function (field) {
+                            if (typeof params !== 'object' || typeof params[field] === 'undefined' || params[field] === '') {
+                                throw 'Required param is not set: "' + field + '".';
+                            }
+                            AWS.params[field] = params[field];
+                        });
+                
+                        var elbAppParts = AWS.params.elb_instance_arn.split('/');
+                        AWS.params.elb_app_id = elbAppParts[1] + '/' + elbAppParts[2] + '/' + elbAppParts[3];
+                
+                        var targetGroupParts = AWS.params.target_group_arn.split(':');
+                        AWS.params.target_group_name = targetGroupParts[targetGroupParts.length - 1];
+                    },
+                    sign: function (key, message) {
+                        var hex = hmac('sha256', key, message);
+                
+                        if ((hex.length % 2) === 1) {
+                            throw 'Invalid length of a hex string!';
+                        }
+                
+                        var result = new Int8Array(hex.length / 2);
+                        for (var i = 0, b = 0; i < hex.length; i += 2, b++) {
+                            result[b] = parseInt(hex.substring(i, i + 2), 16);
+                        }
+                
+                        return result;
+                    },
+                    renderMetricQuery: function (period, elb_app_id, target_group_name) {
+                        var metrics_list = [
+                            'RequestCount:Count:Sum',
+                            'HealthyHostCount:Count:Maximum',
+                            'HTTPCode_Target_2XX_Count:Count:Sum',
+                            'HTTPCode_Target_3XX_Count:Count:Sum',
+                            'HTTPCode_Target_4XX_Count:Count:Sum',
+                            'HTTPCode_Target_5XX_Count:Count:Sum',
+                            'RequestCountPerTarget:Count:Sum',
+                            'TargetConnectionErrorCount:Count:Sum',
+                            'TargetResponseTime:Seconds:Average',
+                            'TargetTLSNegotiationErrorCount:Count:Sum',
+                            'UnHealthyHostCount:Count:Maximum',
+                            'HealthyStateDNS:Count:Minimum',
+                            'HealthyStateRouting:Count:Minimum',
+                            'UnhealthyRoutingRequestCount:Count:Sum',
+                            'UnhealthyStateDNS:Count:Minimum',
+                            'UnhealthyStateRouting:Count:Minimum'
+                        ];
+                
+                        var metric_payload = [];
+                        metrics_list.forEach(function (metric) {
+                            var parts = metric.split(':', 3);
+                            var name = parts[0].replace(/[^a-zA-Z0-9_]/g, '');
+                            metric_payload.push({
+                                'Id': name.charAt(0).toLowerCase() + name.slice(1),
+                                'MetricStat': {
+                                    'Metric': {
+                                        'MetricName': parts[0],
+                                        'Namespace': 'AWS/ApplicationELB',
+                                        'Dimensions': [
+                                            {
+                                                'Name': 'LoadBalancer',
+                                                'Value': elb_app_id
+                                            },
+                                            {
+                                                'Name': 'TargetGroup',
+                                                'Value': target_group_name
+                                            }
+                                        ]
+                                    },
+                                    'Period': period,
+                                    'Stat': parts[2],
+                                    'Unit': parts[1]
+                                }
+                            });
+                        });
+                
+                        return metric_payload;
+                    },
+                    prepareParams: function (params) {
+                        var result = [];
+                
+                        Object.keys(params).sort().forEach(function (key) {
+                            if (typeof params[key] !== 'object') {
+                                result.push(key + '=' + encodeURIComponent(params[key]));
+                            }
+                            else {
+                                result.push(prepareObject(key, params[key]));
+                            }
+                        });
+                
+                        return result.join('&');
+                    },
+                    request: function (method, region, service, request_data) {
+                        if (typeof request_data === 'undefined' || request_data === null) {
+                            request_data = '';
+                        }
+                        else {
+                            request_data = JSON.stringify(request_data)
+                        }
+                
+                        var amzdate = (new Date()).toISOString().replace(/\.\d+Z/, 'Z').replace(/[-:]/g, ''),
+                            date = amzdate.replace(/T\d+Z/, ''),
+                            host = service + '.' + region + '.amazonaws.com',
+                            canonical_uri = '/';
+                
+                            if (AWS.params.auth_type === 'role_base'){
+                                var canonical_headers = 'content-encoding:amz-1.0\n' + 'host:' + host + '\n' + 'x-amz-date:' + amzdate + '\n' + 'x-amz-security-token:' + AWS.params.Token + '\n',
+                                    signed_headers = 'content-encoding;host;x-amz-date;x-amz-security-token';
+                            } else {
+                                var canonical_headers = 'content-encoding:amz-1.0\n' + 'host:' + host + '\n' + 'x-amz-date:' + amzdate + '\n',
+                                    signed_headers = 'content-encoding;host;x-amz-date';
+                            }
+                    
+                            var canonical_request = method + '\n' + canonical_uri + '\n' + '\n' + canonical_headers + '\n' + signed_headers + '\n' + sha256(request_data),
+                                credential_scope = date + '/' + region + '/' + service + '/' + 'aws4_request',
+                            request_string = 'AWS4-HMAC-SHA256' + '\n' + amzdate + '\n' + credential_scope + '\n' + sha256(canonical_request),
+                            key = AWS.sign('AWS4' + AWS.params.SecretAccessKey, date);
+                
+                        key = AWS.sign(key, region);
+                        key = AWS.sign(key, service);
+                        key = AWS.sign(key, 'aws4_request');
+                
+                        var request = new HttpRequest(),
+                            url = 'https://' + host + canonical_uri;
+                
+                        if (typeof AWS.params.proxy !== 'undefined' && AWS.params.proxy !== '') {
+                            request.setProxy(AWS.params.proxy);
+                        }
+                        request.addHeader('x-amz-date: ' + amzdate);
+                        request.addHeader('X-Amz-Target: GraniteServiceVersion20100801.GetMetricData')
+                        request.addHeader('Accept: application/json');
+                        request.addHeader('Content-Type: application/json');
+                        request.addHeader('Content-Encoding: amz-1.0');
+                        request.addHeader('Authorization: ' + 'AWS4-HMAC-SHA256 Credential=' + AWS.params.AccessKeyId + '/' + credential_scope + ', ' + 'SignedHeaders=' + signed_headers + ', ' + 'Signature=' + hmac('sha256', key, request_string));
+                        if (AWS.params.auth_type === 'role_base')
+                            request.addHeader('X-Amz-Security-Token: ' + AWS.params.Token);
+                        
+                        Zabbix.log(4, '[ AWS TargetGroup ] Sending request: ' + url);
+                
+                        response = request.post(url, request_data);
+                        Zabbix.log(4, '[ AWS TargetGroup ] Received response with status code ' + request.getStatus() + ': ' + response);
+                
+                        if (request.getStatus() !== 200) {
+                            throw 'Request failed with status code ' + request.getStatus() + ': ' + response;
+                        }
+                
+                        if (response !== null) {
+                            try {
+                                response = JSON.parse(response);
+                            }
+                            catch (error) {
+                                throw 'Failed to parse response received from AWS CloudWatch API. Check debug log for more information.';
+                            }
+                        }
+                
+                        return response;
+                    },
+                    getMetricsData: function () {
+                        var payload={},
+                            end_time = Math.floor((new Date().getTime())/1000),
+                            start_time = end_time - AWS.request_period;
+                
+                        payload['StartTime'] = start_time;
+                        payload['EndTime'] = end_time;
+                        payload['ScanBy'] = 'TimestampDescending';
+                        payload['MetricDataQueries'] = AWS.renderMetricQuery(AWS.request_period, AWS.params.elb_app_id, AWS.params.target_group_name);
+                        result = AWS.request('POST', AWS.params.region, 'monitoring', payload);
+                        if (typeof result !== 'object' || typeof result.MetricDataResults !== 'object') {
+                            throw 'Cannot get metrics data from AWS CloudWatch API. Check debug log for more information.';
+                        }
+                
+                        return result.MetricDataResults;
+                    }
+                };
+                
+                try {
+                    AWS.setParams(JSON.parse(value));
+                
+                    return JSON.stringify(AWS.getMetricsData());
+                }
+                catch (error) {
+                    error += (String(error).endsWith('.')) ? '' : '.';
+                    Zabbix.log(3, '[ AWS TargetGroup ] ERROR: ' + error);
+                    
+                    return JSON.stringify({'error': error});
+                }
+              description: |
+                이 아이템 프로토타입은 자빅스의 AWS 공식 템플릿을 참고하여 Target Group을 모니터링 하기 위하여 만들었습니다.
+                https://www.zabbix.com/integrations/aws
+                
+                모니터링 데이터는 아래 페이지를 참고하였습니다.
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+                
+                Template by fallboyz@umount.net
+              preprocessing:
+                - type: CHECK_NOT_SUPPORTED
+                  parameters:
+                    - ''
+              timeout: 15s
+              parameters:
+                - name: AccessKeyId
+                  value: '{$AWS.ACCESS.KEY.ID}'
+                - name: auth_type
+                  value: '{$AWS.AUTH_TYPE}'
+                - name: elb_instance_arn
+                  value: '{$AWS.ELB.INSTANCE.ARN}'
+                - name: region
+                  value: '{$AWS.REGION}'
+                - name: SecretAccessKey
+                  value: '{$AWS.SECRET.ACCESS.KEY}'
+                - name: target_group_arn
+                  value: '{#TARGETGROUPARN}'
+              tags:
+                - tag: component
+                  value: raw
+            - uuid: 7d7e938a85dc40ce88c0e72da96f74fe
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: HealthyHostCount'
+              type: DEPENDENT
+              key: 'aws.targetgroup.healthyhostcount[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of targets that are considered healthy.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''HealthyHostCount'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: bc0f96ac0e014eb1a2b57c500ab2603d
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: HealthyStateDNS'
+              type: DEPENDENT
+              key: 'aws.targetgroup.healthystatedns[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of zones that meet the DNS healthy state requirements.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-group-health-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''HealthyStateDNS'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 297f8388ef2d4525a020c89316749c1d
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: HealthyStateRouting'
+              type: DEPENDENT
+              key: 'aws.targetgroup.healthystaterouting[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of zones that meet the routing healthy state requirements.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-group-health-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''HealthyStateRouting'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: d8ce63bc95ca4056816d6f008cdc182b
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: HealthyHostCountHTTPCode_Target_2XX_Count'
+              type: DEPENDENT
+              key: 'aws.targetgroup.httpcode_target_2xx_count[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of HTTP response codes generated by the targets. This does not include any response codes generated by the load balancer.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''HTTPCode_Target_2XX_Count'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 5c4f7477f6d7434596b6d7aa3a5212ea
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: HealthyHostCountHTTPCode_Target_3XX_Count'
+              type: DEPENDENT
+              key: 'aws.targetgroup.httpcode_target_3xx_count[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of HTTP response codes generated by the targets. This does not include any response codes generated by the load balancer.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''HTTPCode_Target_3XX_Count'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 3205b3ce85264bedaa025bf71422ba88
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: HealthyHostCountHTTPCode_Target_4XX_Count'
+              type: DEPENDENT
+              key: 'aws.targetgroup.httpcode_target_4xx_count[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of HTTP response codes generated by the targets. This does not include any response codes generated by the load balancer.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''HTTPCode_Target_4XX_Count'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: a48484b540b24f608c02eaf790a534c8
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: HealthyHostCountHTTPCode_Target_5XX_Count'
+              type: DEPENDENT
+              key: 'aws.targetgroup.httpcode_target_5xx_count[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of HTTP response codes generated by the targets. This does not include any response codes generated by the load balancer.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''HTTPCode_Target_5XX_Count'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 2ec38e35b9d647d4bb59caf4d4129fb3
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: RequestCountPerTarget'
+              type: DEPENDENT
+              key: 'aws.targetgroup.requestcountpertarget[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The average number of requests received by each target in a target group. You must specify the target group using the TargetGroup dimension. This metric does not apply if the target is a Lambda function.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''RequestCountPerTarget'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 59666787fedd47a0a67d3daa154f437c
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: RequestCount'
+              type: DEPENDENT
+              key: 'aws.targetgroup.requestcount[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of requests processed over IPv4 and IPv6. This metric is only incremented for requests where the load balancer node was able to choose a target. Requests that are rejected before a target is chosen are not reflected in this metric.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#load-balancer-metrics-alb
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''RequestCount'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 40da223a9e604b84ac237a1f43d7ae45
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: TargetConnectionErrorCount'
+              type: DEPENDENT
+              key: 'aws.targetgroup.targetconnectionerrorcount[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of connections that were not successfully established between the load balancer and target. This metric does not apply if the target is a Lambda function.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''TargetConnectionErrorCount'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 159c3487bc384b6584f1db518d49898f
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: TargetResponseTime'
+              type: DEPENDENT
+              key: 'aws.targetgroup.targetresponsetime[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              value_type: FLOAT
+              description: |
+                The time elapsed, in seconds, after the request leaves the load balancer until a response from the target is received. This is equivalent to the target_processing_time field in the access logs.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''TargetResponseTime'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: e13bded6ad9c4202a00a16f9bbcec1b6
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: TargetTLSNegotiationErrorCount'
+              type: DEPENDENT
+              key: 'aws.targetgroup.targettlsnegotiationerrorcount[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of TLS connections initiated by the load balancer that did not establish a session with the target. Possible causes include a mismatch of ciphers or protocols. This metric does not apply if the target is a Lambda function.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''TargetTLSNegotiationErrorCount'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: 0b9deb5578914e049af97262696ace56
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: UnHealthyHostCount'
+              type: DEPENDENT
+              key: 'aws.targetgroup.unhealthyhostcount[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of targets that are considered unhealthy.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''UnHealthyHostCount'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: b7de0f0faf4b4a2e9bf81f44d3040e3d
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: UnhealthyRoutingRequestCount'
+              type: DEPENDENT
+              key: 'aws.targetgroup.unhealthyroutingrequestcount[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of requests that are routed using the routing failover action (fail open).
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-group-health-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''UnhealthyRoutingRequestCount'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: a4bc61d14d664925b7505f5ef34d5195
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: UnhealthyStateDNS'
+              type: DEPENDENT
+              key: 'aws.targetgroup.unhealthystatedns[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of zones that do not meet the DNS healthy state requirements and therefore were marked unhealthy in DNS.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-group-health-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''UnhealthyStateDNS'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+            - uuid: eb3ab6653cc04272974a3d5e728ae7aa
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: UnhealthyStateRouting'
+              type: DEPENDENT
+              key: 'aws.targetgroup.unhealthystaterouting[{#TARGETGROUPNAME}]'
+              delay: '0'
+              history: 7d
+              description: |
+                The number of zones that do not meet the routing healthy state requirements, and therefore the load balancer distributes traffic to all targets in the zone, including the unhealthy targets.
+                
+                https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html#target-group-health-metric-table
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.Label == ''UnhealthyStateRouting'')].Values.first().first()'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'aws.targetgroup.get_metrics[{#TARGETGROUPNAME}]'
+              tags:
+                - tag: Application
+                  value: 'AWS TargetGroup'
+          graph_prototypes:
+            - uuid: 2d1664f809174cbf9e67dea0067ddc0b
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: Healthy Host Count HTTP Code Count'
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.httpcode_target_2xx_count[{#TARGETGROUPNAME}]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.httpcode_target_3xx_count[{#TARGETGROUPNAME}]'
+                - sortorder: '2'
+                  color: F63100
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.httpcode_target_4xx_count[{#TARGETGROUPNAME}]'
+                - sortorder: '3'
+                  color: 2774A4
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.httpcode_target_5xx_count[{#TARGETGROUPNAME}]'
+            - uuid: 99313ead6a62471f93b424beaa8ab312
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: Healthy Host State Count'
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.healthyhostcount[{#TARGETGROUPNAME}]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.unhealthyhostcount[{#TARGETGROUPNAME}]'
+            - uuid: 1c83cd5bfa774469aee7664c1b1efb3b
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: Healthy State DNS'
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.healthystatedns[{#TARGETGROUPNAME}]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.unhealthystatedns[{#TARGETGROUPNAME}]'
+            - uuid: 6056959904064ff48333f67bed84e735
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: Healthy State Routing'
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.healthystaterouting[{#TARGETGROUPNAME}]'
+                - sortorder: '1'
+                  color: '274482'
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.unhealthystaterouting[{#TARGETGROUPNAME}]'
+            - uuid: cb1168fd6be24e7f899c1158b0f1d4e1
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: Request Count'
+              graph_items:
+                - color: 3949AB
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.requestcount[{#TARGETGROUPNAME}]'
+            - uuid: 8c6c015e2f7c40ee9229d2167a85c395
+              name: 'AWS TargetGroup: {#TARGETGROUPNAME}: Request Count Per Target'
+              graph_items:
+                - color: 1A7C11
+                  calc_fnc: ALL
+                  item:
+                    host: 'AWS ELB by HTTP'
+                    key: 'aws.targetgroup.requestcountpertarget[{#TARGETGROUPNAME}]'
+          timeout: 15s
+          parameters:
+            - name: AccessKeyId
+              value: '{$AWS.ACCESS.KEY.ID}'
+            - name: auth_type
+              value: '{$AWS.AUTH_TYPE}'
+            - name: elb_instance_arn
+              value: '{$AWS.ELB.INSTANCE.ARN}'
+            - name: region
+              value: '{$AWS.REGION}'
+            - name: SecretAccessKey
+              value: '{$AWS.SECRET.ACCESS.KEY}'
       tags:
         - tag: class
           value: software
@@ -834,17 +1757,32 @@ zabbix_export:
           value: aws
         - tag: target
           value: loadbalancer
+        - tag: target
+          value: targetgroup
       macros:
         - macro: '{$AWS.ACCESS.KEY.ID}'
           description: 'Access key ID.'
         - macro: '{$AWS.AUTH_TYPE}'
           value: role_base
           description: 'Authorization method. Possible values: role_base, access_key.'
-        - macro: '{$AWS.ELB.INSTANCE.ID}'
-          description: 'app/{load_balancer_name}/{alphanumeric_code} in the ELB ARN.'
+        - macro: '{$AWS.ELB.4XX.WARN}'
+          value: '100'
+          description: 'Please write down the value to use as Warning in the trigger.'
+        - macro: '{$AWS.ELB.5XX.WARN}'
+          value: '100'
+          description: 'Please write down the value to use as Warning in the trigger.'
+        - macro: '{$AWS.ELB.ACTIVECONNECTION.WARN}'
+          value: '5000'
+          description: 'Please write down the value to use as Warning in the trigger.'
+        - macro: '{$AWS.ELB.INSTANCE.ARN}'
+          type: SECRET_TEXT
+          description: 'ELB ARN.'
+        - macro: '{$AWS.ELB.REJECTED.WARN}'
+          value: '50'
+          description: 'Please write down the value to use as Warning in the trigger.'
         - macro: '{$AWS.REGION}'
           value: ap-northeast-2
-          description: 'Amazon ELB Region code.'
+          description: 'Amazon Region code.'
         - macro: '{$AWS.SECRET.ACCESS.KEY}'
           type: SECRET_TEXT
           description: 'Secret access key.'

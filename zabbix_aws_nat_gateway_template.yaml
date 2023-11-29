@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2023-11-23T07:19:58Z'
+  date: '2023-11-29T02:34:04Z'
   groups:
     - uuid: c2c162144c2d4c5491c8801193af4945
       name: Templates/Cloud
@@ -57,6 +57,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ActiveConnectionCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -78,6 +79,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "BytesInFromDestination")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -99,6 +101,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "BytesInFromSource")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -122,6 +125,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "BytesOutToDestination")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -162,6 +166,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ConnectionAttemptCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -181,6 +186,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ConnectionEstablishedCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -200,6 +206,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "ErrorPortAllocation")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -494,6 +501,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "IdleTimeoutCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -513,6 +521,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "PacketsDropCount")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -532,6 +541,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "PacketsInFromDestination")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -551,6 +561,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "PacketsInFromSource")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -570,6 +581,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "PacketsOutToDestination")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -589,6 +601,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "PacketsOutToSource")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -608,6 +621,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "PeakBytesPerSecond")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -627,6 +641,7 @@ zabbix_export:
             - type: JSONPATH
               parameters:
                 - '$.[?(@.Label == "PeakPacketsPerSecond")].Values.first().first()'
+              error_handler: DISCARD_VALUE
           master_item:
             key: aws.natgateway.get_metrics
           tags:
@@ -648,7 +663,7 @@ zabbix_export:
         - macro: '{$AWS.NAT.GATEWAY.ID}'
           description: 'Nat Gateway ID.'
         - macro: '{$AWS.REGION}'
-          description: 'Amazon ELB Region code.'
+          description: 'Amazon Region code.'
         - macro: '{$AWS.SECRET.ACCESS.KEY}'
           type: SECRET_TEXT
           description: 'Secret access key.'
