@@ -41,11 +41,12 @@ Before using the template, make sure you have the appropriate IAM permissions fo
 - `{$AWS.AUTH_TYPE}`: Enter `role_base` for role-based access, or `access_key` for access key based authentication.
 - `{$AWS.ELB.INSTANCE.ARN}`: Your Load Balancer's ARN.
 - `{$AWS.REGION}`: Your AWS Region.
+- `{$AWS.SECRET.ACCESS.KEY}`: Your AWS Secret Access Key.
 - `{$AWS.ELB.4XX.WARN}`: Enter the value to be used as a warning in the trigger for the HTTP 4XX error code.
 - `{$AWS.ELB.5XX.WARN}`: Enter the value to be used as a warning in the trigger for the HTTP 5XX error code.
 - `{$AWS.ELB.REJECTED.WARN}`: Enter a value to use as an alert in the trigger when there are too many rejected connections.
 - `{$AWS.ELB.ACTIVECONNECTION.WARN}`: Enter a value to use as a warning in the trigger for too many active connections.
-
+- 
 <br />
 
 ## AWS NAT Gateway Monitoring Template (`zabbix_aws_nat_gateway_template.yaml`)
