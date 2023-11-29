@@ -42,7 +42,7 @@ Before using the template, make sure you have the appropriate IAM permissions fo
 - `{$AWS.ELB.INSTANCE.ARN}`: Your Load Balancer's ARN.
 - `{$AWS.REGION}`: Your AWS Region.
 - `{$AWS.ELB.4XX.WARN}`: Enter the value to be used as a warning in the trigger for the HTTP 4XX error code.
-- `{$AWS.ELB.4XX.WARN}`: Enter the value to be used as a warning in the trigger for the HTTP 5XX error code.
+- `{$AWS.ELB.5XX.WARN}`: Enter the value to be used as a warning in the trigger for the HTTP 5XX error code.
 - `{$AWS.ELB.REJECTED.WARN}`: Enter a value to use as an alert in the trigger when there are too many rejected connections.
 - `{$AWS.ELB.ACTIVECONNECTION.WARN}`: Enter a value to use as a warning in the trigger for too many active connections.
 
