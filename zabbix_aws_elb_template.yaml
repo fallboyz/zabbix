@@ -1,6 +1,6 @@
 zabbix_export:
   version: '6.0'
-  date: '2023-11-29T02:35:18Z'
+  date: '2023-11-29T03:03:49Z'
   groups:
     - uuid: c2c162144c2d4c5491c8801193af4945
       name: Templates/Cloud
@@ -16,11 +16,14 @@ zabbix_export:
         https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
         
         매크로 설명
-        {$AWS.ACCESS.KEY.ID} : 억세스 키
-        {$AWS.AUTH_TYPE} : 역활 기반이면 role_base, 인증키 기반이면 access_key 입력
-        {$AWS.ELB.INSTANCE.ID} : 로드발란서의 ARN값에서 app/my-alb/ed123456a12f01d0 부분에 해당하는 값
-        {$AWS.REGION} : 로드발란서가 있는 AWS 지역 코드
-        {$AWS.SECRET.ACCESS.KEY} : 시크릿 키
+        {$AWS.ACCESS.KEY.ID}: AWS 액세스 키입니다.
+        {$AWS.AUTH_TYPE}: 역할 기반(role_base) 인증 또는 액세스키 기반(access_key) 인증을 위해 입력합니다.
+        {$AWS.ELB.INSTANCE.ARN}: 로드 밸런서의 ARN입니다.
+        {$AWS.REGION}: AWS 리전입니다.
+        {$AWS.ELB.4XX.WARN}: HTTP 4XX 오류 코드에 대한 트리거에 경고로 사용할 값을 입력합니다.
+        {$AWS.ELB.4XX.WARN}: HTTP 5XX 오류 코드에 대한 트리거에 경고로 사용할 값을 입력합니다.
+        {$AWS.ELB.REJECTED.WARN}: 거부된 연결이 너무 많을 때 트리거에서 경고로 사용할 값을 입력합니다.
+        {$AWS.ELB.ACTIVECONNECTION.WARN}: 너무 많은 활성 연결에 대한 트리거에서 경고로 사용할 값을 입력합니다.
         
         주의: 적절한 IAM 권한이 있어야 합니다. 아래는 최소 권한 정책이며, 바뀔 수 있습니다.
         {
